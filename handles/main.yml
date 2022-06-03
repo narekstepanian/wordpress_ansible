@@ -1,0 +1,6 @@
+---
+handlers:
+  -name: Reload Nginx
+  service:
+    name: Nginx
+    state: Restart

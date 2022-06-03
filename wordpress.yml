@@ -1,0 +1,64 @@
+---
+- hosts: EC2
+  become: true
+  vars_files:
+    - /home/narek/wordpress_ansible/vars/external_vars.yml
+
+  tasks:
+    - name: apt update
+      apt: name=aptitude update_cache=yes state=latest
+    
+    - name: install all needed packages
+      apt: name={{ item }} update_cache=yes state=latest
+      loop: [ 'nginx', 'mysql-server', 'php', 'php-mysql', 'php-fpm', 'python3-pymysql' ]
+    
+    - name: Sets Nginx conf file
+      template:
+        src: "files/nginx.conf.j2"
+        dest: "/etc/nginx/sites-available/{{ http_conf }}"
+    - name: Config Nginx - Delete nginx default page
+      command:
+        cmd: 'rm -rf /var/www/html'
+    - name: Enables new site
+      file:
+        src: "/etc/nginx/sites-available/{{ http_conf }}"
+        dest: "/etc/nginx/sites-enabled/{{ http_conf }}"
+        state: link
+      notify: Reload Nginx
+    - name: 'mysql root user'
+      mysql_user:
+        name: 'root'
+        password: "{{ mysql_root_password }}"
+        login_unix_socket: '/var/run/mysqld/mysqld.sock'
+    - name: 'create db'
+      mysql_db:
+        name: 'wordpress'
+        state: 'present'
+        login_user: 'root'
+        login_password: "{{ mysql_root_password }}"
+    - name: 'create db user'
+      mysql_user:
+        name: 'wordpress'
+        password: 'wordpress'
+        priv: '*.*:ALL'
+        login_user: 'root'
+        login_password: "{{ mysql_root_password }}" 
+    - name: Download binaries
+      get_url:
+        url: https://wordpress.org/latest.tar.gz
+        dest: /var/www/
+
+    - name: Download wordpress 
+      unarchive:
+        src: /var/www/wordpress-6.0.tar.gz
+        dest: /var/www/
+        owner: 'www-data'
+        group: 'www-data'
+        remote_src: yes
+    # - name: 'copy wp-config.php file to localhost'
+    #   copy:
+    #     src: 'wp-config.php'
+    #     dest: '/var/www/wordpress'
+    #     owner: 'www-data'
+    #     group: 'www-data'
+    
